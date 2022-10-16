@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTimer } from 'react-timer-hook';
 
 export const getExpiryTime = (millisecondsToLast: number) => {
@@ -7,11 +7,17 @@ export const getExpiryTime = (millisecondsToLast: number) => {
   return time;
 };
 
-export function Timer({ timeToLast }: any) {
+export function Timer({ timeToLast, autoStart = false, started, onTimerEnd }: any) {
   const { seconds, minutes, isRunning, start, pause, resume, restart } = useTimer({
     expiryTimestamp: timeToLast,
-    onExpire: () => console.warn('onExpire called'),
+    onExpire: onTimerEnd,
+    autoStart,
   });
+
+  useEffect(() => {
+    if (started) resume();
+    if (!started) pause();
+  }, [started]);
 
   return (
     <div>
@@ -19,7 +25,7 @@ export function Timer({ timeToLast }: any) {
         <span>{minutes}</span>:<span>{seconds}</span>
       </div>
       <p>{isRunning ? 'Running' : 'Not running'}</p>
-      <span className="isolate inline-flex rounded-md shadow-sm">
+      {/* <span className="isolate inline-flex rounded-md shadow-sm">
         <button
           onClick={start}
           type="button"
@@ -41,7 +47,7 @@ export function Timer({ timeToLast }: any) {
         >
           Resume
         </button>
-      </span>
+      </span> */}
       {/* <button
         onClick={() => {
           // Restarts to 5 minutes timer

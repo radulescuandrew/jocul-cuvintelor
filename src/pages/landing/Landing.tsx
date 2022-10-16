@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import InputField from '../../common/components/input-field/InputField';
 import { getExpiryTime, Timer } from '../../common/components/Timer';
-import { GLOBAL_TIMER_T0 } from '../../common/constants/General.constants';
-import { WORDS_SETS } from '../../common/constants/WordSets.constants';
+import { GLOBAL_TIMER_T0, SOLUTION_TIMER_T0 } from '../../common/constants/General.constants';
+import { QA, WORDS_SETS } from '../../common/constants/WordSets.constants';
 
 /*
   
@@ -55,62 +54,199 @@ import { WORDS_SETS } from '../../common/constants/WordSets.constants';
 const WORDS: any = WORDS_SETS;
 
 const Landing = () => {
-  const [wordsSet, setWordsSet] = useState(WORDS_SETS[0]);
-  const [currentQA, setCurrentQA] = useState(WORDS_SETS[0][4][0]);
+  const [wordsSet, setWordsSet] = useState(WORDS_SETS);
+  const [lastQuestionId, setLastQuestionId] = useState<number>();
+
+  const [currentQA, setCurrentQA] = useState<QA>(WORDS_SETS[0]);
+  const [prize, setPrize] = useState(0);
+  const [currentPrize, setCurrentPrize] = useState(WORDS_SETS[0].word.length * 10);
+
   const [letters, setLetters] = useState(
-    Array.from({ length: WORDS_SETS[0][4][0].word.length }) as string[],
+    Array.from({ length: WORDS_SETS[0].word.length }) as string[],
   );
 
+  const [isNewGameStarted, setIsNewGameStarted] = useState(false);
+  const [isGameEnded, setIsGameEnded] = useState(false);
+  const [isGameActive, setIsGameActive] = useState(false);
+  const [isSolutionPhase, setIsSolutionPhase] = useState(false);
+
+  useEffect(() => {
+    console.table({ isNewGameStarted, isGameActive, isSolutionPhase });
+  });
+
+  useEffect(() => {
+    const max = Math.max(...wordsSet.map((qa) => qa.id));
+    setLastQuestionId(max);
+  }, [wordsSet]);
+
+  useEffect(() => {
+    setCurrentPrize((currentQA?.word?.length - letters.filter(Boolean).length) * 10);
+  }, [letters]);
+
+  useEffect(() => {
+    if (isNewGameStarted) {
+      setIsGameActive(true);
+      setIsSolutionPhase(false);
+      setLetters(Array.from({ length: WORDS_SETS[0].word.length }) as string[]);
+      setPrize(0);
+      setCurrentPrize(wordsSet[0].word.length * 10);
+      setCurrentQA(wordsSet[0]);
+    }
+  }, [isNewGameStarted]);
+
   const giveLetter = () => {
-    const currWordLetters = currentQA.word.split('');
-    // Exclude already existing letters to find the pool used to get a random letter
-    // const remaining = currWordLetters.reduce((arr: any, curr, i) => {
-    //   return letters.includes(curr) ? arr : { ...arr, i: curr };
-    // }, {});
+    if (currentQA.word.length !== letters.length) return;
 
-    // const newLetters = [...letters];
+    let freeIndex = -1;
+    while (freeIndex === -1) {
+      const index = Math.floor(Math.random() * currentQA.word.length);
+      if (!letters[index]) {
+        freeIndex = index;
+      }
+    }
 
-    // setLetters([...letters]);
+    const lettersCopy = [...letters];
+    lettersCopy[freeIndex] = currentQA.word[freeIndex];
 
-    // console.log(remaining);
+    setLetters(lettersCopy);
   };
 
-  const giveSolution = () => undefined;
+  const giveSolution = () => {
+    setIsGameActive(false);
+    setIsSolutionPhase(true);
+  };
 
-  const startCurrentTimer = () => undefined;
-  const stopGlobalTimer = () => undefined;
+  const onWrongSolution = () => {
+    setIsSolutionPhase(false);
+    setPrize(prize - currentPrize);
+    setLetters(currentQA.word.split(''));
+  };
+
+  const onCorrectSolution = () => {
+    setIsSolutionPhase(false);
+    setPrize(prize + currentPrize);
+    setLetters(currentQA.word.split(''));
+  };
+
+  const nextWord = () => {
+    const next = wordsSet.find((qa) => qa.id == currentQA.id + 1);
+    if (next && !isGameEnded) {
+      setLetters(Array.from({ length: next.word.length }) as string[]);
+      setCurrentQA(next);
+      setIsGameActive(true);
+    } else {
+      alert(`Game ended, you won ${prize} RON`);
+    }
+  };
+
+  const gameEnded = () => {
+    giveSolution();
+    setIsGameEnded(true);
+  };
 
   /** HELPERS */
 
   return (
     <div>
-      <div className="mb-1">
-        Global timer
-        <Timer timeToLast={getExpiryTime(GLOBAL_TIMER_T0)} />
-      </div>
-      <hr />
-      <div>
-        <div>Current question: {currentQA.question}</div>
-        <div>Current word: {currentQA.word} (to be hidden)</div>
-      </div>
-
-      <div id="solution-boxes" className="mt-5 flex">
-        {currentQA.word.split('').map((letter, i) => {
-          return (
-            <div key={letter + i} className="mx-2 w-[3rem] h-[3rem] border-2 border-indigo-500/100">
-              {letters[i] || ''}
+      {isNewGameStarted && (
+        <div className="game-zone">
+          <div className="flex justify-between mb-1">
+            <div>
+              Global timer{' '}
+              <Timer
+                timeToLast={getExpiryTime(GLOBAL_TIMER_T0)}
+                onTimerEnd={gameEnded}
+                started={isGameActive}
+              />
             </div>
-          );
-        })}
-      </div>
+            {isSolutionPhase && (
+              <div>
+                Solution timer{' '}
+                <Timer
+                  timeToLast={getExpiryTime(SOLUTION_TIMER_T0)}
+                  started={isSolutionPhase}
+                  onTimerEnd={onWrongSolution}
+                />
+              </div>
+            )}
 
-      <button
-        onClick={giveLetter}
-        type="button"
-        className="relative mt-2 inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-      >
-        Da-mi litera
-      </button>
+            <div style={{ fontSize: '50px' }}>
+              <span>Prize: {prize}</span>
+            </div>
+          </div>
+          <hr />
+          <div>
+            <div>Current question: {currentQA?.question}</div>
+            {/* <div>Current word: {currentQA?.word} (to be hidden)</div> */}
+            <div>Current possible prize: {currentPrize}</div>
+          </div>
+
+          <div id="solution-boxes" className="mt-5 flex">
+            {currentQA?.word.split('').map((letter: string, i: number) => {
+              return (
+                <div
+                  key={letter + i}
+                  className="mx-2 w-[3rem] h-[3rem] border-2 border-indigo-500/100"
+                >
+                  {letters[i] || ''}
+                </div>
+              );
+            })}
+          </div>
+          {!isSolutionPhase && (
+            <div>
+              {isGameActive && (
+                <div>
+                  <button
+                    onClick={giveLetter}
+                    type="button"
+                    className="relative mt-2 inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    Da-mi litera
+                  </button>
+                  <button
+                    onClick={giveSolution}
+                    type="button"
+                    className="relative mt-2 inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    Opresc timpul
+                  </button>
+                </div>
+              )}
+              {!isGameActive && (
+                <button
+                  onClick={nextWord}
+                  type="button"
+                  className="relative mt-2 inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  {currentQA.id == lastQuestionId || isGameEnded
+                    ? 'Vezi rezultat'
+                    : 'Urmatorul cuvant'}
+                </button>
+              )}
+            </div>
+          )}
+          {isSolutionPhase && (
+            <button
+              onClick={onCorrectSolution}
+              type="button"
+              className="relative mt-2 inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              Solutia este corecta
+            </button>
+          )}
+        </div>
+      )}
+
+      {!isNewGameStarted && (
+        <button
+          onClick={() => setIsNewGameStarted(true)}
+          type="button"
+          className="relative mt-2 inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        >
+          Incepe jocul
+        </button>
+      )}
     </div>
   );
 };
